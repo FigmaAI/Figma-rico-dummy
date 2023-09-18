@@ -1,46 +1,74 @@
-import React from 'react';
-import logo from '../assets/logo.svg';
+import React, { useState, useEffect } from 'react';
+import { FileUploader } from 'react-drag-drop-files';
+import { Button, TextField, Container, Typography, Grid, Stack } from '@mui/material';
 import '../styles/ui.css';
 
 function App() {
-  const textbox = React.useRef<HTMLInputElement>(undefined);
-
-  const countRef = React.useCallback((element: HTMLInputElement) => {
-    if (element) element.value = '5';
-    textbox.current = element;
-  }, []);
+  const [files, setFiles] = useState<File[]>([]);
+  const [index, setIndex] = useState(0);
+  const handleChange = (fileList: FileList) => {
+    setFiles(Array.from(fileList));
+  };
 
   const onCreate = () => {
-    const count = parseInt(textbox.current.value, 10);
-    parent.postMessage({ pluginMessage: { type: 'create-rectangles', count } }, '*');
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fileContents = event.target.result;
+        parent.postMessage({ pluginMessage: { type: 'create-texts', fileName: file.name, fileContents } }, '*');
+      };
+      reader.readAsText(file);
+    });
   };
 
-  const onCancel = () => {
-    parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*');
+  const handleIndexChange = (event) => {
+    setIndex(parseInt(event.target.value));
+    parent.postMessage({ pluginMessage: { type: 'update-index', index: event.target.value } }, '*');
   };
 
-  React.useEffect(() => {
-    // This is how we read messages sent from the plugin controller
+  const handleRefreshClick = () => {
+    parent.postMessage({ pluginMessage: { type: 'init' } }, '*');
+  };
+
+  useEffect(() => {
     window.onmessage = (event) => {
-      const { type, message } = event.data.pluginMessage;
-      if (type === 'create-rectangles') {
-        console.log(`Figma Says: ${message}`);
+      if (event.data.pluginMessage.type === 'init') {
+        setIndex(event.data.pluginMessage.index);
       }
     };
   }, []);
 
   return (
-    <div>
-      <img src={logo} />
-      <h2>Rectangle Creator</h2>
-      <p>
-        Count: <input ref={countRef} />
-      </p>
-      <button id="create" onClick={onCreate}>
-        Create
-      </button>
-      <button onClick={onCancel}>Cancel</button>
-    </div>
+    <Container>
+      <Typography variant="h6" component="h6" marginBottom={2}>
+        Create Text Nodes from JSON
+      </Typography>
+      <Grid container spacing={3} direction="row" justifyContent="space-evenly" alignItems="center">
+        <Grid item xs={12}>
+          <FileUploader handleChange={handleChange} name="file" multiple={true} types={['JSON']} />
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="caption" noWrap>
+            {files.length > 0 ? `File name: ${files[0].name} and ${files.length - 1} files` : 'no files uploaded yet'}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Stack direction="row"
+            spacing={2}>
+            <TextField size="small" label="Index" type="number" value={index} onChange={handleIndexChange} />
+            <Button size='small' onClick={handleRefreshClick}>Refresh</Button>
+          </Stack>
+        </Grid>
+
+
+
+        <Grid item xs={12}>
+          <Button variant="contained" color="primary" fullWidth onClick={onCreate}>
+            Create
+          </Button>
+        </Grid>
+      </Grid>
+    </Container>
   );
 }
 
